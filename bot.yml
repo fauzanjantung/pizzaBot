@@ -1,0 +1,300 @@
+name: Enterprise Solution - POC
+tag: latest
+projectName: pizza
+flows:
+    fallback:
+        active: true
+        volatile: true
+        fallback: true
+        intents:
+            fallback:
+                type: text
+                initial: false
+                fallback: true
+        states:
+            init:
+                transitions:
+                    init:
+                        fallback: true
+                action: fallbackMessage
+                initial: true
+                end: true
+        actions:
+            fallbackMessage:
+                type: text
+                options:
+                    text: 'Sorry, i don''t understand :('
+    order:
+        active: true
+        intents:
+            order:
+                type: text
+                initial: true
+                fallback: false
+                classifier:
+                    nlu: order
+            pizza:
+                type: data
+                initial: false
+                fallback: false
+                condition: payload.type == "pizza"
+            reenter:
+                type: command
+                initial: false
+                fallback: false
+                condition: content == "reenter"
+            quantity:
+                type: text
+                initial: false
+                fallback: false
+                classifier:
+                    nlu: quantity
+                attributes:
+                    quantity:
+                        nlu: quantity
+            'yes':
+                type: text
+                initial: false
+                fallback: false
+                classifier:
+                    nlu: yesno
+                    match: 'yes'
+            'no':
+                type: text
+                initial: false
+                fallback: false
+                classifier:
+                    nlu: yesno
+                    match: 'no'
+        states:
+            init:
+                transitions:
+                    showPizza:
+                        condition: intent == "order"
+                initial: true
+            showPizza:
+                transitions:
+                    pizzaQuantity:
+                        condition: intent == "pizza"
+                        mapping:
+                            context:
+                                pizza: payload.pizza
+                action:
+                    -
+                        name: showPizza
+                    -
+                        name: askOptions
+            pizzaQuantity:
+                transitions:
+                    confirmPizza:
+                        condition: intent == "quantity"
+                        mapping:
+                            context:
+                                quantity: attributes.quantity
+                                answer: 'null'
+                action: askQuantity
+            confirmPizza:
+                transitions:
+                    done:
+                        fallback: true
+                action: askConfirmation
+                transit:
+                    context:
+                        answer: intent
+            done:
+                action:
+                    -
+                        name: sayCancel
+                        condition: context.answer == "no"
+                    -
+                        name: toConfirmFlow
+                        condition: context.answer == "yes"
+                end: true
+        actions:
+            showPizza:
+                type: template
+                options:
+                    type: carousel
+                    items:
+                        -
+                            title: Pepperoni
+                            text: Pepperoni
+                            thumbnailImageUrl: >-
+                                https://www.wikihow.com/images/thumb/a/a7/Make-Pepperoni-Pizza-Step-19-Version-2.jpg/aid1074004-v4-728px-Make-Pepperoni-Pizza-Step-19-Version-2.jpg.webp
+                            actions:
+                                -
+                                    type: postback
+                                    label: Pepperoni
+                                    payload:
+                                        type: pizza
+                                        pizza: Pepperoni
+                        -
+                            title: Veggie Lovers
+                            text: Vegie vegie stay healthy
+                            thumbnailImageUrl: 'https://www.calcuttaweb.com/store/image/data/calcutta/pizza/veggie-lovers-pizza-pihu-7.jpg'
+                            actions:
+                                -
+                                    type: postback
+                                    label: Veggie Lovers
+                                    payload:
+                                        type: pizza
+                                        pizza: Veggie Lovers
+            askOptions:
+                type: text
+                options:
+                    text: '''Please \n choose \\n our /\n menu /\/\n okay.'''
+            askQuantity:
+                type: text
+                options:
+                    text: How many pizza do you want? Min 1-9
+            askConfirmation:
+                type: text
+                options:
+                    text: Do you want to order $(context.quantity) $(context.pizza) ?
+            sayThanks:
+                type: text
+                options:
+                    text: Thank you for your order!
+            sayCancel:
+                type: text
+                options:
+                    text: Your order is canceled.
+            toConfirmFlow:
+                type: command
+                options:
+                    command: confirm
+    confirm:
+        active: true
+        volatile: true
+        intents:
+            userInput:
+                type: text
+                initial: false
+                fallback: false
+                priority: 10
+            credentials:
+                type: text
+                initial: false
+                fallback: false
+                priority: 15
+                classifer:
+                    -
+                        nlu: superModel
+                        options:
+                            labels: true
+                        match: person
+                    -
+                        nlu: superModel
+                        options:
+                            labels: true
+                        match: location
+                    -
+                        nlu: superModel
+                        options:
+                            labels: true
+                        match: phone
+                attributes:
+                    person:
+                        nlu: superModel
+                        path: person
+                    location:
+                        nlu: superModel
+                        path: location
+                    phone:
+                        nlu: superModel
+                        path: phone
+            confirmIntent:
+                type: command
+                initial: true
+                fallback: false
+                condition: content ==  "confirm"
+        states:
+            init:
+                transitions:
+                    askName:
+                        fallback: true
+                initial: true
+            askName:
+                transitions:
+                    askLocation:
+                        condition: intent == "credentials"
+                action: askingName
+                transit:
+                    mapping:
+                        context:
+                            person: attributes.person
+            askLocation:
+                transitions:
+                    askPhone:
+                        condition: intent == "credentials"
+                        mapping:
+                            context:
+                                location: attributes.location
+                action: askLocation
+            askPhone:
+                transitions:
+                    end:
+                        condition: intent == "credentials"
+                        mapping:
+                            context:
+                                phone: attributes.phone
+                action: askPhone
+            end:
+                action: sayPhone
+                end: true
+        actions:
+            askingName:
+                type: text
+                options:
+                    text: $(cms.confirmation.form.name.value)
+                    cmsType: textbox
+            askLocation:
+                type: text
+                options:
+                    text: $(cms.confirmation.form.location.value)
+                    cmsType: textbox
+            askPhone:
+                type: text
+                options:
+                    text: $(cms.confirmation.form.phone.value)
+                    cmsType: textbox
+            sayThanks:
+                type: text
+                options:
+                    text: $(cms.confirmation.form.thanks.value)
+                    cmsType: textlist
+            sayPhone:
+                type: text
+                options:
+                    text: Okay nanti aku telpon kamu di nomor $(context.phone) ya
+nlus:
+    superModel:
+        type: nl
+        options:
+            nluId: 'Enterprise Solution - POC:pizza'
+            threshold: '0.9'
+            output: phrase
+            entity: kata
+    order:
+        type: keyword
+        options:
+            keywords:
+                order:
+                    - order
+                    - pesan
+                    - order pizza
+    quantity:
+        type: regex
+        options:
+            regex: '[1-9]'
+    yesno:
+        type: keyword
+        options:
+            keywords:
+                'yes':
+                    - 'yes'
+                    - ya
+                'no':
+                    - 'no'
+                    - tidak
+author: ''
